@@ -1,0 +1,87 @@
+[
+    {
+      "fields": {
+        "city": "Prague"
+      },
+      "model": "cars.branch",
+      "pk": 1
+    },
+    {
+      "fields": {
+        "city": "Brno"
+      },
+      "model": "cars.branch",
+      "pk": 2
+    },
+    {
+      "fields": {
+        "city": "Ostrava"
+      },
+      "model": "cars.branch",
+      "pk": 3
+    },
+    {
+      "fields": {
+        "city": "Plzeň"
+      },
+      "model": "cars.branch",
+      "pk": 4
+    },
+    {
+      "fields": {
+        "city": "České Budějovice"
+      },
+      "model": "cars.branch",
+      "pk": 5
+    },
+    {
+      "fields": {
+        "car_number": "C523671934",
+        "make": "BMW",
+        "model": "X7",
+        "branch": 1
+      },
+      "model": "cars.car",
+      "pk": 1
+    },
+    {
+      "fields": {
+        "car_number": "C5213125546",
+        "make": "BMW",
+        "model": "M3",
+        "branch": 1
+      },
+      "model": "cars.car",
+      "pk": 2
+    },
+    {
+      "fields": {
+        "car_number": "C3215187658",
+        "make": "Toyota",
+        "model": "Prius",
+        "branch": 3
+      },
+      "model": "cars.car",
+      "pk": 3
+    },
+    {
+      "fields": {
+        "car_number": "C244215786",
+        "make": "Toyota",
+        "model": "Land Cruiser",
+        "branch": 2
+      },
+      "model": "cars.car",
+      "pk": 4
+    },
+    {
+      "fields": {
+        "car_number": "C960785431",
+        "make": "Mercedes-Benz",
+        "model": "AMG G 63 SUV",
+        "branch": 5
+      },
+      "model": "cars.car",
+      "pk": 5
+    }
+]
