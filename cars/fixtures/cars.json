@@ -22,14 +22,14 @@
     },
     {
       "fields": {
-        "city": "Plzeň"
+        "city": "Plzen"
       },
       "model": "cars.branch",
       "pk": 4
     },
     {
       "fields": {
-        "city": "České Budějovice"
+        "city": "Ceske Budejovice"
       },
       "model": "cars.branch",
       "pk": 5
