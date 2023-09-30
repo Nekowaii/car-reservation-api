@@ -23,7 +23,7 @@ class Branch(models.Model):
     city = models.CharField(max_length=100)
 
     def __str__(self):
-        return self.city
+        return f"{self.id} {self.city}"
 
 
 class DistanceQuerySet(models.QuerySet):
@@ -65,7 +65,40 @@ class CarQuerySet(models.QuerySet):
         reserved_car_ids = Reservation.objects.reserved_between(
             start_time, end_time
         ).values_list("car_id", flat=True)
+
         return self.exclude(id__in=reserved_car_ids)
+
+    def available_at_branch_between(self, start_time, end_time, branch):
+        latest_car_branch_before_start = (
+            CarBranchLog.objects.filter(
+                car=models.OuterRef("pk"), timestamp__lte=start_time
+            )
+            .order_by("-timestamp")
+            .values("branch_id")[:1]
+        )
+
+        return (
+            self.available_between(start_time, end_time)
+            .annotate(current_branch_id=models.Subquery(latest_car_branch_before_start))
+            .filter(current_branch_id=branch.id)
+        )
+
+    # def available_at_branch_between(self, start_time, end_time, branch):
+    #    latest_car_branch_before_start = (
+    #        CarBranchLog.objects.filter(
+    #            car=models.OuterRef("pk"), timestamp__lte=start_time
+    #        )
+    #        .order_by("-timestamp")
+    #        .values("branch_id")[:1]
+    #    )
+
+
+#
+#    return (
+#        self.available_between(start_time, end_time)
+#        .annotate(current_branch_id=models.Subquery(latest_car_branch_before_start))
+#        .filter(current_branch_id=branch.id)
+#    )
 
 
 class CarManager(models.Manager):
@@ -74,6 +107,26 @@ class CarManager(models.Manager):
 
     def available_between(self, start_time, end_time):
         return self.get_queryset().available_between(start_time, end_time)
+
+    def available_at_branch_between(self, start_time, end_time, branch):
+        return self.get_queryset().available_at_branch_between(
+            start_time, end_time, branch
+        )
+
+    # def available_between(self, start_time, end_time):
+    #   latest_car_branch = (
+    #       CarBranchLog.objects.historical()
+    #       .filter(car=OuterRef("pk"))
+    #       .order_by("-timestamp")
+    #       .values("branch_id")[:1]
+    #   )
+    # return (
+    #    self.get_queryset()
+    #    .available_between(start_time, end_time)
+    #    .annotate(
+    #        current_branch_id=Subquery(latest_car_branch),
+    #    )
+    # )
 
 
 class Car(models.Model):
@@ -92,23 +145,17 @@ class Car(models.Model):
         super(Car, self).save(*args, **kwargs)
 
 
-class CarBranchQuerySet(models.QuerySet):
-    def historical(self):
-        return self.filter(timestamp__lt=now())
-
-    def historical_branch(self, branch):
-        return self.historical().filter(branch=branch)
+class CarBranchLogQuerySet(models.QuerySet):
+    def historical(self, from_time):
+        return self.filter(timestamp__lt=from_time)
 
 
 class CarBranchLogManager(models.Manager):
     def get_queryset(self):
-        return CarBranchQuerySet(self.model, using=self._db)
+        return CarBranchLogQuerySet(self.model, using=self._db)
 
-    def historical(self):
-        return self.get_queryset().historical().order_by("timestamp")
-
-    def historical_branch(self, branch):
-        return self.get_queryset().historical_branch(branch).order_by("timestamp")
+    def historical(self, from_time):
+        return self.get_queryset().historical(from_time)
 
 
 class CarBranchLog(models.Model):
@@ -125,6 +172,12 @@ class CarBranchLog(models.Model):
 class ReservationQuerySet(models.QuerySet):
     def upcoming(self):
         return self.filter(start_time__gt=now()).order_by("start_time")
+
+    def previous_reservations(self, date_time):
+        return self.filter(end_time__lt=date_time).order_by("end_time")
+
+    def next_reservations(self, date_time):
+        return self.filter(start_time__gt=date_time).order_by("-start_time")
 
     def reserved_at(self, date_time):
         return self.filter(start_time__lte=date_time, end_time__gte=date_time).order_by(
@@ -144,6 +197,12 @@ class ReservationManager(models.Manager):
 
     def upcoming(self):
         return self.get_queryset().upcoming()
+
+    def previous_reservations(self, date_time):
+        return self.get_queryset().previous_reservations(date_time)
+
+    def next_reservations(self, date_time):
+        return self.get_queryset().next_reservations(date_time)
 
     def reserved_at(self, date_time):
         return self.get_queryset().reserved_at(date_time)
