@@ -156,7 +156,7 @@ class CreateReservation(graphene.Mutation):
             pickup_branch, return_branch
         )
 
-        if required_transfer_time > duration_time:
+        if required_transfer_time and required_transfer_time > duration_time:
             raise GraphQLError(
                 f"Can't reach the branch: {return_branch} in time. Required transfer time: {total_minutes(required_transfer_time)} minutes."
             )

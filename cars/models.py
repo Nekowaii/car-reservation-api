@@ -3,12 +3,7 @@ from django.db import models
 from django.core.validators import RegexValidator
 from django.core.exceptions import ValidationError
 from django.utils.timezone import now
-from cars.managers import (
-    DistanceManager,
-    CarManager,
-    CarBranchLogManager,
-    ReservationManager,
-)
+from cars.managers import DistanceManager, CarManager, ReservationManager
 
 
 class CarNumberField(models.CharField):
@@ -81,8 +76,6 @@ class CarBranchLog(models.Model):
     car = models.ForeignKey(Car, on_delete=models.CASCADE)
     branch = models.ForeignKey(Branch, on_delete=models.CASCADE)
     timestamp = models.DateTimeField()
-
-    objects = CarBranchLogManager()
 
     def __str__(self):
         return f"{self.car} {self.branch} {self.timestamp}"

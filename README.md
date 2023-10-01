@@ -10,19 +10,34 @@ Available GraphQL mutations:
 ### createCar
 ```
 mutation {
-  createCar(carData: {carNumber: "C244215786", make: "Toyota", model: " Land Cruiser", branch: {city: "Ostrava"}}) {
+  createCar(carData: {carNumber: "C523671934", make: "BMW", model: "X7", branch: {city: "Prague"}}) {
     car {
       carNumber,
       make,
       model
-    },
-    carBranchLog {
-      branch {
-        id,
-        city
-      },
-      timestamp
     }
+  }
+}
+```
+
+### updateCar
+```
+mutation {
+  updateCar(carData: {carNumber: "C523671934", make: "BMW", model: "X8"}) {
+    car {
+      carNumber,
+      make,
+      model
+    }
+  }
+}
+```
+
+### deleteCar
+```
+mutation {
+  deleteCar(carNumber: "C523671934") {
+    ok
   }
 }
 ```
@@ -31,11 +46,27 @@ mutation {
 ```
 mutation {
   createReservation(reservationData: 
-    {startTime: "2023-10-01T16:01:30+00:00", 
-      durationMinutes: 500, 
-      pickupBranch: {city: "Ostrava"}, 
+    {
+      startTime: "2023-10-01T17:07:28.930429+00:00", 
+      durationMinutes: 2, 
+      pickupBranch: {city: "Prague"}, 
       returnBranch: {city: "Prague"}}) 
   {
+    reservation {
+      car { 
+        carNumber, 
+        make,
+        model
+      },
+      startTime,
+      endTime,
+      pickupBranch {
+        city
+      },
+      returnBranch {
+        city
+      }
+    }
     ok
   }
 }
