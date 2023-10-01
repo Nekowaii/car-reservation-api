@@ -2,9 +2,10 @@ import graphene
 from graphene_django import DjangoObjectType
 from django.utils.timezone import now
 from cars.models import Branch, Car, Reservation, CarBranchLog, Distance
+from cars.utils import total_minutes
+from cars.car_search import find_available_car
 import datetime
-from collections import defaultdict
-from django.db.models import OuterRef, Subquery, Max, IntegerField, BigAutoField
+from django.db.models import OuterRef, Subquery, Max, IntegerField, BigAutoField, F
 from django.db.models.functions import Coalesce
 from graphql import GraphQLError
 
@@ -24,18 +25,18 @@ class CarType(DjangoObjectType):
 
     class Meta:
         model = Car
-        fields = ["id", "car_number", "make", "model", "current_branch"]
+        fields = ["id", "car_number", "make", "model"]
 
-    def resolve_current_branch(self, info):
-        return (
-            CarBranchLog.objects.historical(from_time=now())
-            .filter(car=self)
-            .first()
-            .branch
-        )
+    # def resolve_current_branch(self, info):
+    #    return (
+    #        CarBranchLog.objects.historical(end_time=now())
+    #        .filter(car=self)
+    #        .first()
+    #        .branch
+    #    )
 
 
-class CarInput(graphene.InputObjectType):
+class CreateCarInput(graphene.InputObjectType):
     car_number = graphene.String(required=True)
     make = graphene.String(required=True)
     model = graphene.String(required=True)
@@ -50,9 +51,8 @@ class CarBranchLogType(DjangoObjectType):
 
 class CreateCar(graphene.Mutation):
     class Arguments:
-        car_data = CarInput(required=True)
+        car_data = CreateCarInput(required=True)
 
-    # Output = CreateCarPayload
     car = graphene.Field(CarType)
     car_branch_log = graphene.Field(CarBranchLogType)
 
@@ -77,22 +77,37 @@ class DeleteCar(graphene.Mutation):
     @staticmethod
     def mutate(root, info, car_number):
         car = Car.objects.get(car_number=car_number)
+
+        if Reservation.objects.reserved_now(car):
+            raise GraphQLError("Can't delete a car that is reserved now.")
+
         car.delete()
+
         return DeleteCar(ok=True)
+
+
+class UpdateCarInput(graphene.InputObjectType):
+    car_number = graphene.String(required=True)
+    make = graphene.String(required=True)
+    model = graphene.String(required=True)
 
 
 class UpdateCar(graphene.Mutation):
     class Arguments:
-        car_data = CarInput(required=True)
+        car_data = UpdateCarInput(required=True)
 
     car = graphene.Field(CarType)
 
     @staticmethod
     def mutate(root, info, car_data):
         car = Car.objects.get(car_number=car_data.car_number)
+
+        if Reservation.objects.reserved_now(car):
+            raise GraphQLError("Can't update a car that is reserved now.")
+
         car.make = car_data.make
         car.model = car_data.model
-        car.branch = Branch.objects.get(city=car_data.branch.city)
+
         return UpdateCar(car=car)
 
 
@@ -124,114 +139,35 @@ class CreateReservation(graphene.Mutation):
     ok = graphene.Boolean()
     reservation = graphene.Field(ReservationType)
 
-    @staticmethod
-    def find_available_car(start_time, end_time, pickup_branch, return_branch):
-        branch_to_cars = defaultdict(list)
-        # end_time = start_time + datetime.timedelta(minutes=duration_minutes)
-
-        # available_cars = Car.objects.available_at_branch_between(
-        #    start_time, end_time, pickup_branch
-        # )
-
-        available_cars = Car.objects.available_between(start_time, end_time)
-
-        latest_car_branch = (
-            CarBranchLog.objects.filter(timestamp__lt=start_time, car=OuterRef("pk"))
-            .order_by("-timestamp")
-            .values("branch_id")[:1]
-        )
-
-        available_cars = available_cars.annotate(
-            current_branch_id=Subquery(latest_car_branch)
-        )
-
-        next_reservations = {
-            res.car_id: res
-            for res in Reservation.objects.next_reservations(end_time).filter(
-                car__in=available_cars
-            )
-        }
-
-        previous_reservations = {
-            res.car_id: res
-            for res in Reservation.objects.previous_reservations(start_time).filter(
-                car__in=available_cars
-            )
-        }
-
-        for car in available_cars:
-            branch_to_cars[car.current_branch_id].append(car)
-
-        def is_car_available_next(res, end_time, return_branch):
-            if res.pickup_branch == return_branch and res.start_time > end_time:
-                return True
-
-            required_transfer_time = Distance.objects.transfer_time(
-                res.pickup_branch, return_branch
-            )
-
-            if required_transfer_time:
-                if end_time + required_transfer_time <= res.start_time:
-                    return True
-
-            return False
-
-        print(branch_to_cars)
-        print(next_reservations)
-        print("SEARCHING IN THE CURRENT BRANCH...")
-        for car in branch_to_cars[pickup_branch.id]:
-            res = next_reservations.get(car.id, None)
-            if not res or is_car_available_next(res, end_time, return_branch):
-                print(car)
-                return car
-
-        print("NO CAR AVAILABLE AT CURRENT BRANCH")
-        print("SEARCHING IN OTHER BRANCHES...")
-
-        def is_car_available_prev(res, start_time, pickup_branch):
-            if res.return_branch == pickup_branch and res.end_time < start_time:
-                return True
-
-            required_transfer_time = Distance.objects.transfer_time(
-                res.return_branch, pickup_branch
-            )
-
-            if required_transfer_time:
-                if start_time - required_transfer_time >= res.end_time:
-                    return True
-
-            return False
-
-        for branch_id, cars in branch_to_cars.items():
-            if branch_id == pickup_branch.id:
-                continue
-            print(pickup_branch.id, start_time, branch_id, cars)
-            for car in cars:
-                res = next_reservations.get(car.id, None)
-                if res and not is_car_available_next(res, end_time, return_branch):
-                    continue
-                res = previous_reservations.get(car.id, None)
-                if res and not is_car_available_prev(res, end_time, return_branch):
-                    continue
-                print(car, car.current_branch_id)
-                return car
-
-        return None
-
     @classmethod
     def mutate(cls, root, info, reservation_data):
         pickup_branch = Branch.objects.get(city=reservation_data.pickup_branch.city)
         return_branch = Branch.objects.get(city=reservation_data.return_branch.city)
-        end_time = reservation_data.start_time + datetime.timedelta(
-            minutes=reservation_data.duration_minutes
+        duration_time = datetime.timedelta(minutes=reservation_data.duration_minutes)
+        end_time = reservation_data.start_time + duration_time
+
+        if reservation_data.start_time < now():
+            raise GraphQLError("Start time must be in the future.")
+
+        if not pickup_branch or not return_branch:
+            raise GraphQLError("Invalid branch.")
+
+        required_transfer_time = Distance.objects.transfer_time(
+            pickup_branch, return_branch
         )
 
-        car = cls.find_available_car(
+        if required_transfer_time > duration_time:
+            raise GraphQLError(
+                f"Can't reach the branch: {return_branch} in time. Required transfer time: {total_minutes(required_transfer_time)} minutes."
+            )
+
+        car = find_available_car(
             reservation_data.start_time,
             end_time,
             pickup_branch,
             return_branch,
         )
+
         if not car:
             raise GraphQLError("No car available.")
 
@@ -242,12 +178,7 @@ class CreateReservation(graphene.Mutation):
             pickup_branch=pickup_branch,
             return_branch=return_branch,
         )
-        CarBranchLog.objects.create(
-            car=car, branch=pickup_branch, timestamp=reservation.start_time
-        )
-        CarBranchLog.objects.create(
-            car=car, branch=return_branch, timestamp=reservation.end_time
-        )
+
         return CreateReservation(ok=True, reservation=reservation)
         # return CreateReservation(reservation=reservation)
 
