@@ -57,20 +57,20 @@ class ReservationQuerySet(models.QuerySet):
     def upcoming(self):
         return self.filter(start_time__gt=now()).order_by("start_time")
 
-    def previous_reservations(self, date_time):
-        return self.filter(end_time__lt=date_time).order_by("end_time")
+    # def previous_reservations(self, date_time):
+    #    return self.filter(end_time__lt=date_time).order_by("end_time")
+
+    # def next_reservations(self, date_time):
+    #    return self.filter(start_time__gt=date_time).order_by("-start_time")
 
     def next_reservations(self, date_time):
-        return self.filter(start_time__gt=date_time).order_by("-start_time")
-
-    def next_reservations_new(self, date_time):
         next_reservation = self.filter(
             start_time__gt=date_time, car_id=models.OuterRef("car_id")
         ).order_by("start_time")[:1]
 
         return self.filter(id__in=models.Subquery(next_reservation.values("id")))
 
-    def previous_reservations_new(self, date_time):
+    def previous_reservations(self, date_time):
         previous_reservation = self.filter(
             end_time__lt=date_time, car_id=models.OuterRef("car_id")
         ).order_by("-end_time")[:1]
@@ -91,17 +91,17 @@ class ReservationManager(models.Manager):
     def upcoming(self):
         return self.get_queryset().upcoming()
 
-    def previous_reservations(self, date_time):
-        return self.get_queryset().previous_reservations(date_time)
+    # def previous_reservations(self, date_time):
+    #    return self.get_queryset().previous_reservations(date_time)
 
-    def next_reservations(self, date_time):
-        return self.get_queryset().next_reservations(date_time)
+    # def next_reservations(self, date_time):
+    #    return self.get_queryset().next_reservations(date_time)
 
     def reserved_now(self, car):
         return self.get_queryset().reserved_now(car)
 
-    def next_reservations_new(self, date_time):
-        return self.get_queryset().next_reservations_new(date_time)
+    def next_reservations(self, date_time):
+        return self.get_queryset().next_reservations(date_time)
 
-    def previous_reservations_new(self, date_time):
-        return self.get_queryset().previous_reservations_new(date_time)
+    def previous_reservations(self, date_time):
+        return self.get_queryset().previous_reservations(date_time)

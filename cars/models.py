@@ -1,8 +1,6 @@
 from django.db import models
-from django.db import models
 from django.core.validators import RegexValidator
 from django.core.exceptions import ValidationError
-from django.utils.timezone import now
 from cars.managers import DistanceManager, CarManager, ReservationManager
 
 

@@ -67,7 +67,6 @@ mutation {
         city
       }
     }
-    ok
   }
 }
 ```

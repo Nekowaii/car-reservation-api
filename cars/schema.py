@@ -5,8 +5,6 @@ from cars.models import Branch, Car, Reservation, CarBranchLog, Distance
 from cars.utils import total_minutes
 from cars.car_search import find_available_car
 import datetime
-from django.db.models import OuterRef, Subquery, Max, IntegerField, BigAutoField, F
-from django.db.models.functions import Coalesce
 from graphql import GraphQLError
 
 
@@ -29,8 +27,9 @@ class CarType(DjangoObjectType):
 
     # def resolve_current_branch(self, info):
     #    return (
-    #        CarBranchLog.objects.historical(end_time=now())
+    #        CarBranchLog.objects.filter(timestamp__lt=now())
     #        .filter(car=self)
+    #        .order_by("-timestamp")
     #        .first()
     #        .branch
     #    )
@@ -135,8 +134,6 @@ class CreateReservation(graphene.Mutation):
     class Arguments:
         reservation_data = ReservationInput(required=True)
 
-    # reservation = graphene.Field(ReservationType)
-    ok = graphene.Boolean()
     reservation = graphene.Field(ReservationType)
 
     @classmethod
@@ -179,8 +176,7 @@ class CreateReservation(graphene.Mutation):
             return_branch=return_branch,
         )
 
-        return CreateReservation(ok=True, reservation=reservation)
-        # return CreateReservation(reservation=reservation)
+        return CreateReservation(reservation=reservation)
 
 
 class Mutation(graphene.ObjectType):

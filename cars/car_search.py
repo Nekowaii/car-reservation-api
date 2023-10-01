@@ -1,7 +1,5 @@
 from collections import defaultdict
-from cars.models import Car, Distance, CarBranchLog, Reservation
-from django.db.models import OuterRef, Subquery
-from django.utils.timezone import now
+from cars.models import Car, Distance, Reservation
 
 
 def is_car_available_lower_bound(res, start_time, pickup_branch):
@@ -41,19 +39,12 @@ def find_available_car(start_time, end_time, pickup_branch, return_branch):
         )
     }
 
-    # print("NEXT")
-    # print(Reservation.objects.next_reservations_new(now()))
-    # print("PREVIOUS")
-    # print(Reservation.objects.previous_reservations_new(now()))
-
-    print(next_reservations)
     previous_reservations = {
         res.car_id: res
         for res in Reservation.objects.previous_reservations(start_time).filter(
             car__in=available_cars
         )
     }
-    print(previous_reservations)
 
     for car in available_cars:
         branch_to_cars[car.current_branch_id].append(car)
