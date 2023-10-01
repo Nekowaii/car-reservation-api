@@ -14,6 +14,17 @@ class DistanceManager(models.Manager):
     def get_queryset(self):
         return DistanceQuerySet(self.model, using=self._db)
 
+    def distance_km(self, from_branch, to_branch):
+        if from_branch == to_branch:
+            return 0
+
+        distance = self.get_queryset().distance(from_branch, to_branch)
+
+        if not distance:
+            return None
+
+        return distance.distance_km
+
     def transfer_time(self, from_branch, to_branch):
         distance = self.get_queryset().distance(from_branch, to_branch)
         if not distance:

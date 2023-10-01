@@ -3,7 +3,7 @@ from graphene_django import DjangoObjectType
 from django.utils.timezone import now
 from cars.models import Branch, Car, Reservation, CarBranchLog, Distance
 from cars.utils import total_minutes
-from cars.car_search import find_available_car
+from cars.car_search import find_available_car, find_available_cars
 import datetime
 from graphql import GraphQLError
 
@@ -130,6 +130,28 @@ class ReservationInput(graphene.InputObjectType):
     return_branch = BranchInput(required=True)
 
 
+def validate_reservation(reservation_data):
+    pickup_branch = Branch.objects.get(city=reservation_data.pickup_branch.city)
+    return_branch = Branch.objects.get(city=reservation_data.return_branch.city)
+    duration_time = datetime.timedelta(minutes=reservation_data.duration_minutes)
+    end_time = reservation_data.start_time + duration_time
+
+    if reservation_data.start_time < now():
+        raise GraphQLError("Start time must be in the future.")
+    if not pickup_branch or not return_branch:
+        raise GraphQLError("Invalid branch.")
+
+    required_transfer_time = Distance.objects.transfer_time(
+        pickup_branch, return_branch
+    )
+    if required_transfer_time and required_transfer_time > duration_time:
+        raise GraphQLError(
+            f"Can't reach the branch: {return_branch} in time. Required transfer time: {total_minutes(required_transfer_time)} minutes."
+        )
+
+    return reservation_data.start_time, end_time, pickup_branch, return_branch
+
+
 class CreateReservation(graphene.Mutation):
     class Arguments:
         reservation_data = ReservationInput(required=True)
@@ -138,28 +160,12 @@ class CreateReservation(graphene.Mutation):
 
     @classmethod
     def mutate(cls, root, info, reservation_data):
-        pickup_branch = Branch.objects.get(city=reservation_data.pickup_branch.city)
-        return_branch = Branch.objects.get(city=reservation_data.return_branch.city)
-        duration_time = datetime.timedelta(minutes=reservation_data.duration_minutes)
-        end_time = reservation_data.start_time + duration_time
-
-        if reservation_data.start_time < now():
-            raise GraphQLError("Start time must be in the future.")
-
-        if not pickup_branch or not return_branch:
-            raise GraphQLError("Invalid branch.")
-
-        required_transfer_time = Distance.objects.transfer_time(
-            pickup_branch, return_branch
+        start_time, end_time, pickup_branch, return_branch = validate_reservation(
+            reservation_data
         )
 
-        if required_transfer_time and required_transfer_time > duration_time:
-            raise GraphQLError(
-                f"Can't reach the branch: {return_branch} in time. Required transfer time: {total_minutes(required_transfer_time)} minutes."
-            )
-
         car = find_available_car(
-            reservation_data.start_time,
+            start_time,
             end_time,
             pickup_branch,
             return_branch,
@@ -179,11 +185,31 @@ class CreateReservation(graphene.Mutation):
         return CreateReservation(reservation=reservation)
 
 
+class CreateReservations(graphene.Mutation):
+    class Arguments:
+        reservations_data = graphene.List(ReservationInput, required=True)
+
+    reservations = graphene.List(ReservationType)
+
+    @classmethod
+    def mutate(cls, root, info, reservations_data):
+        reservations = []
+
+        reservation_list = []
+        for reservation_data in reservations_data:
+            reservation_list.append(validate_reservation(reservation_data))
+
+        reservations = find_available_cars(reservation_list)
+
+        return CreateReservations(reservations=reservations)
+
+
 class Mutation(graphene.ObjectType):
     create_car = CreateCar.Field()
     delete_car = DeleteCar.Field()
     update_car = UpdateCar.Field()
     create_reservation = CreateReservation.Field()
+    create_reservations = CreateReservations.Field()
 
 
 class Query(graphene.ObjectType):
