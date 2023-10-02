@@ -1,12 +1,67 @@
 # car-reservation-api
 
+The Car Reservation API 
 
-Available GraphQL mutations:
+## Dependencies
+- docker
+- python==3.11
+- django==4.2.5
+- graphene-django==3.1.5
+
+## Getting Started / Installation:
+1. Install [Docker](https://www.docker.com/) and [Docker Compose](https://docs.docker.com/compose/).
+2. Navigate to the project directory: `cd car-reservation-api`
+3. Run the application: `docker-compose up`
+4. Open in browser `http://127.0.0.1:8000/graphql`
+
+## Testing
+To run all of the automation tests in a project: 
+```
+docker-compose run web python manage.py test
+```
+
+## API Usage
+The system communicates exclusively via GraphQL. Below are the main GraphQL mutations and queries provided:
+- allCars
+- upcomingReservations
 - createCar
 - updateCar
 - deleteCar
 - createReservation
 - createReservations
+
+### allCars
+```
+query {
+  allCars {
+    id
+    carNumber
+    make
+    model
+  }
+}
+```
+
+### upcomingReservations
+```
+query {
+  upcomingReservations {
+    car {
+      carNumber,
+      make,
+      model
+    },
+    startTime,
+    endTime,
+    pickupBranch {
+      city
+    }
+    returnBranch {
+      city
+    }
+  }
+}
+```
 
 ### createCar
 ```
