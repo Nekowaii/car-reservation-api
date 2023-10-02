@@ -3,7 +3,7 @@ from graphene_django import DjangoObjectType
 from django.utils.timezone import now
 from cars.models import Branch, Car, Reservation, CarBranchLog, Distance
 from cars.utils import total_minutes
-from cars.car_search import find_available_car, find_available_cars
+from cars.car_search import reserve_car, reserve_cars
 import datetime
 from graphql import GraphQLError
 
@@ -164,23 +164,15 @@ class CreateReservation(graphene.Mutation):
             reservation_data
         )
 
-        car = find_available_car(
+        reservation = reserve_car(
             start_time,
             end_time,
             pickup_branch,
             return_branch,
         )
 
-        if not car:
+        if not reservation:
             raise GraphQLError("No car available.")
-
-        reservation = Reservation.objects.create(
-            car=car,
-            start_time=reservation_data.start_time,
-            end_time=end_time,
-            pickup_branch=pickup_branch,
-            return_branch=return_branch,
-        )
 
         return CreateReservation(reservation=reservation)
 
@@ -199,7 +191,10 @@ class CreateReservations(graphene.Mutation):
         for reservation_data in reservations_data:
             reservation_list.append(validate_reservation(reservation_data))
 
-        reservations = find_available_cars(reservation_list)
+        reservations = reserve_cars(reservation_list)
+
+        if not reservations:
+            raise GraphQLError("No car available.")
 
         return CreateReservations(reservations=reservations)
 

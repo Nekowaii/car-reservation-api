@@ -6,6 +6,7 @@ Available GraphQL mutations:
 - updateCar
 - deleteCar
 - createReservation
+- createReservations
 
 ### createCar
 ```
@@ -65,6 +66,62 @@ mutation {
       },
       returnBranch {
         city
+      }
+    }
+  }
+}
+```
+
+### createReservations
+```
+mutation {
+  createReservations(reservationsData: 
+    [
+      {
+        startTime: "2023-10-04T17:39:28.930429+00:00", 
+        durationMinutes: 390, 
+        pickupBranch: {
+          city: "Prague"
+        }, 
+        returnBranch: {
+          city: "Ostrava"
+        }
+      }, 
+      {
+        startTime: "2023-10-03T17:39:28.930429+00:00",
+        durationMinutes: 390, 
+        pickupBranch: {
+          city: "Prague"
+        }, 
+        returnBranch: {
+          city: "Prague"
+        }
+      }, 
+      {
+        startTime: "2023-10-02T17:39:28.930429+00:00", 
+        durationMinutes: 390, 
+        pickupBranch: {
+          city: "Prague"
+        }, 
+        returnBranch: {
+          city: "Prague"
+        }
+      }
+    ]
+  ) 
+  {
+    reservations {
+      car {
+        make,
+        model
+      }
+      startTime,
+      endTime,
+      pickupBranch {
+        id
+      },
+      returnBranch {
+        id
       }
     }
   }

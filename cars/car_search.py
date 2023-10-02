@@ -28,53 +28,7 @@ def is_car_available_upper_bound(res, end_time, return_branch):
     return False
 
 
-def find_available_car(start_time, end_time, pickup_branch, return_branch):
-    branch_to_cars = defaultdict(list)
-    available_cars = Car.objects.available_cars(
-        start_time, end_time
-    ).with_current_branch(start_time)
-
-    next_reservations = {
-        res.car_id: res
-        for res in Reservation.objects.next_reservations(end_time).filter(
-            car__in=available_cars
-        )
-    }
-
-    previous_reservations = {
-        res.car_id: res
-        for res in Reservation.objects.previous_reservations(start_time).filter(
-            car__in=available_cars
-        )
-    }
-
-    for car in available_cars:
-        branch_to_cars[car.current_branch_id].append(car)
-
-    # print("SEARCHING IN THE CURRENT BRANCH...")
-    for car in branch_to_cars[pickup_branch.id]:
-        res = next_reservations.get(car.id, None)
-        if not res or is_car_available_upper_bound(res, end_time, return_branch):
-            return car
-    # print("NO CAR AVAILABLE AT CURRENT BRANCH")
-    # print("SEARCHING IN OTHER BRANCHES...")
-
-    for branch_id, cars in branch_to_cars.items():
-        if branch_id == pickup_branch.id:
-            continue
-
-        for car in cars:
-            res = next_reservations.get(car.id, None)
-            if res and not is_car_available_upper_bound(res, end_time, return_branch):
-                continue
-            res = previous_reservations.get(car.id, None)
-            if res and not is_car_available_lower_bound(res, start_time, pickup_branch):
-                continue
-            return car
-    return None
-
-
-def find_available_car_new(start_time, end_time, pickup_branch, return_branch):
+def get_available_cars(start_time, end_time, pickup_branch, return_branch):
     branch_to_cars = defaultdict(list)
     available_cars = Car.objects.available_cars(
         start_time, end_time
@@ -117,7 +71,22 @@ def find_available_car_new(start_time, end_time, pickup_branch, return_branch):
             if res and not is_car_available_lower_bound(res, start_time, pickup_branch):
                 continue
             yield car
-    return None
+
+
+def reserve_car(start_time, end_time, pickup_branch, return_branch):
+    cars = get_available_cars(start_time, end_time, pickup_branch, return_branch)
+    car = next(cars, None)
+
+    if not car:
+        return None
+
+    return Reservation.objects.create(
+        car=car,
+        start_time=start_time,
+        end_time=end_time,
+        pickup_branch=pickup_branch,
+        return_branch=return_branch,
+    )
 
 
 def get_nearest_car(pickup_branch, cars):
@@ -141,7 +110,7 @@ def get_nearest_car(pickup_branch, cars):
 
 
 @transaction.atomic
-def find_available_cars(reservation_request_list):
+def reserve_cars(reservation_request_list):
     reservations = []
     reservation_request_list.sort(key=lambda x: x[0])
 
@@ -149,11 +118,11 @@ def find_available_cars(reservation_request_list):
         start_time, end_time, pickup_branch, return_branch = reservation_request
 
         cars = list(
-            find_available_car_new(start_time, end_time, pickup_branch, return_branch)
+            get_available_cars(start_time, end_time, pickup_branch, return_branch)
         )
 
         if not cars:
-            raise GraphQLError("No car available.")
+            return []
 
         car = get_nearest_car(pickup_branch, cars)
 
